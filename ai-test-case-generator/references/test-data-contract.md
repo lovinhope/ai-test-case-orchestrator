@@ -1,0 +1,33 @@
+# Test-database data contract
+
+Use this contract when a generated test case requires concrete records in a test database. This capability creates test data only for the current test run; it is not a general database administration interface.
+
+## Configuration and environment safety
+
+- Resolve the database configuration from the local project/test configuration or an explicitly configured `TEST_DB_CONFIG_PATH`. Never ask the requester to paste credentials into chat and never print credentials, connection URLs containing secrets, or full connection errors.
+- Support the existing Lowrisk data-mock adapter when the requested scenario matches its asset and table rules. Reuse its schema mappings and reference resolvers instead of duplicating SQL.
+- Before connecting, verify an explicit non-production environment marker (`test`, `qa`, `staging`, or equivalent), host/database allowlist, and account scope. If the target cannot be proven non-production, stop with `test_database_unverified`; do not connect or write.
+- Prefer a read-only connection for discovery. Use a write-capable connection only after the user has explicitly requested data creation for this test run.
+
+## Data-generation workflow
+
+1. Derive the required records from the case preconditions, rule/state under test, asset type, and existing reference data.
+2. Query existing reference data first and reuse stable IDs where safe; do not invent foreign keys, enum values, or business states that are not present in the schema or verified reference data.
+3. Produce a data plan before writing: scenario, tables/entities, fields, source of each value, uniqueness strategy, expected IDs, cleanup strategy, and linked case numbers.
+4. Generate an idempotent, run-scoped dataset using a unique `run_id`/test tag. Keep inserts, updates, and required state transitions traceable to the case.
+5. Execute writes in a transaction or an equivalent compensating-rollback boundary. Verify inserted rows and the required business state after writing.
+6. Persist a non-secret manifest at `04-test-data-manifest.md` containing environment name, run id, created entity/table identifiers, verification results, cleanup command or procedure, and linked cases. Never persist passwords or tokens.
+7. If any step fails, roll back or clean up the run-scoped records and leave the case in `test_data_pending`; never claim that data exists.
+
+## Required controls
+
+- Do not use production data as test data without approved anonymization and an explicit safe-copy process.
+- Do not perform broad `UPDATE`, `DELETE`, schema changes, permission changes, or unscoped writes.
+- Do not delete pre-existing records. Cleanup may remove only records created by the current run and only when the manifest proves ownership.
+- Respect foreign-key order, audit fields, tenant/product scope, and business workflows; direct database state changes must not bypass required setup APIs when the case depends on API behavior.
+- Mask sensitive values in logs and artifacts.
+- If the database adapter, schema, or environment is unavailable, generate a data plan or executable SQL draft for review, but do not report successful creation.
+
+## Case linkage
+
+Every case that uses generated data must reference the manifest and its own data-set identifier in `前置条件` and `来源及依据`. A case is not executable until its required data-set status is `verified`.

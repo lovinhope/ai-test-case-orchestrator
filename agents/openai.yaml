@@ -1,0 +1,11 @@
+interface:
+  display_name: "AI Commit Test Orchestrator"
+  short_description: "Run association, challenge, test-point, and manual-case stages for one commit"
+  default_prompt: "Use $ai-test-case-orchestrator to analyze this single commit and generate human-reviewed manual test artifacts."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "atlassian"
+      description: "Read-only Confluence and Jira evidence"
+policy:
+  allow_implicit_invocation: true
