@@ -1,0 +1,13 @@
+[publish]
+# Required: Confluence parent page ID or full page URL. This is the publication path,
+# not the standards page. Keep the standards references below for validation traceability.
+parent_page =
+title_prefix = 候选测试用例
+allow_duplicate = false
+standards_page = https://confluence.example.invalid/pages/viewpage.action?pageId=<standards-page-id>
+format_page = https://confluence.example.invalid/pages/viewpage.action?pageId=<format-page-id>
+
+# Optional: default page title. The script appends the source task key when available.
+page_title =
+jira_key = <jira-key>
+business_requirement = <business-requirement-summary>

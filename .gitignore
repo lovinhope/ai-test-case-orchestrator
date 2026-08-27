@@ -3,4 +3,5 @@ __pycache__/
 .venv/
 venv/
 .env
+ai-test-case-generator/test-case-publish.ini
 web/runtime/
