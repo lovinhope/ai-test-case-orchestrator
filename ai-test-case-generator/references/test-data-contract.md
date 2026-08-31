@@ -11,13 +11,14 @@ Use this contract when a generated test case requires concrete records in a test
 
 ## Data-generation workflow
 
-1. Derive the required records from the case preconditions, rule/state under test, asset type, and existing reference data.
-2. Query existing reference data first and reuse stable IDs where safe; do not invent foreign keys, enum values, or business states that are not present in the schema or verified reference data.
-3. Produce a data plan before writing: scenario, tables/entities, fields, source of each value, uniqueness strategy, expected IDs, cleanup strategy, and linked case numbers.
-4. Generate an idempotent, run-scoped dataset using a unique `run_id`/test tag. Keep inserts, updates, and required state transitions traceable to the case.
-5. Execute writes in a transaction or an equivalent compensating-rollback boundary. Verify inserted rows and the required business state after writing.
-6. Persist a non-secret manifest at `04-test-data-manifest.md` containing environment name, run id, created entity/table identifiers, verification results, cleanup command or procedure, and linked cases. Never persist passwords or tokens.
-7. If any step fails, roll back or clean up the run-scoped records and leave the case in `test_data_pending`; never claim that data exists.
+1. Decide whether the case requires data, then derive the complete minimum dataset from the changed project code and call chain: actual entry point, tables/entities, joins, filters, caches, enums, statuses, dates, scope, and upstream/downstream records—not from the requirement text alone.
+2. Query existing reference data first and reuse stable IDs where safe. Inspect schema, mapper/SQL, DTOs, configuration, fixtures, and reference tables to confirm field meaning and value semantics. Do not invent foreign keys, enum values, business states, product codes, stock types/statuses, or fields that are not present in verified project evidence.
+3. Include every record required to reach the asserted branch and its control branch, including related order, position, valuation, page-query, permission, cache, or daily-snapshot data when those are read by the implementation. Prefer one shared dataset when cases have identical parameters and required state; document the case-to-dataset mapping instead of duplicating records.
+4. Produce a data plan before writing: scenario, code path, tables/entities, fields, source of each value, required relationships/state transitions, uniqueness strategy, expected IDs, cleanup strategy, and linked case numbers.
+5. Generate an idempotent, run-scoped dataset using a unique `run_id`/test tag. Keep inserts, updates, and required state transitions traceable to the case.
+6. Execute writes in a transaction or an equivalent compensating-rollback boundary. Verify inserted rows and the required business state after writing.
+7. Persist a non-secret manifest at `04-test-data-manifest.md` containing environment name, run id, created entity/table identifiers, verification results, cleanup command or procedure, and linked cases. Never persist passwords or tokens.
+8. If code, schema, reference data, or environment verification fails, stop data creation, record the exact blocker and unresolved field/value, leave the dataset `待准备`/`test_data_pending`, and never claim that data exists.
 
 ## Required controls
 

@@ -12,9 +12,9 @@ from urllib.parse import quote, unquote, urlparse
 import requests
 from requests.auth import HTTPBasicAuth
 
-DEFAULT_JIRA_BASE = "http://jira.lowrisk.com.cn"
-DEFAULT_CONFLUENCE_BASE = "http://confluence.lowrisk.com.cn"
-DEFAULT_GITLAB_BASE = "http://git.lowrisk.com.cn"
+DEFAULT_JIRA_BASE = "https://jira.example.invalid"
+DEFAULT_CONFLUENCE_BASE = "https://confluence.example.invalid"
+DEFAULT_GITLAB_BASE = "https://git.example.invalid"
 DEFAULT_PROJECTS = ["CHATGPT", "PRODUCT", "HR", "TIDS", "RISK"]
 
 

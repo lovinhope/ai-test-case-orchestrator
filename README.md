@@ -12,15 +12,15 @@ C:\Users\<用户名>\.codex\lowrisk-jira.ini
 
 ```ini
 [jira]
-base_url = http://jira.lowrisk.com.cn
+base_url = https://jira.example.invalid
 jira_token = <Jira API Token>
 
 [confluence]
-base_url = http://confluence.lowrisk.com.cn
+base_url = https://confluence.example.invalid
 token = <Confluence Token>
 
 [gitlab]
-base_url = http://git.lowrisk.com.cn
+base_url = https://git.example.invalid
 token = <GitLab Token>
 ```
 

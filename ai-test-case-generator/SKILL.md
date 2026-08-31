@@ -19,4 +19,8 @@ Case generation is append-only by revision. Preserve every original test case an
 
 Only after a case is explicitly adopted or modified and approved for delivery may it be pushed to Confluence. Build the published content from the configured `[test_case_template]` page, not from the local default schema alone, and publish it under the configured `[test_case_publish]` space and `menu_id`. Preserve the template's structure and field order; do not publish pending or discarded cases. Record the destination space, menu id, published case numbers, and publish result in the delivery artifact.
 
+Before drafting a case, explicitly decide whether it requires test data. For every database-backed case, derive the required data from the implementation and call chain, including actual tables/entities, joins, filters, caches, enums, statuses, dates, scopes, and dependent records. Use the smallest complete verified dataset; never invent codes, statuses, fields, or foreign keys. If a required value or table cannot be verified, record the blocker and leave the dataset `待准备`.
+
+When publishing cases to Confluence, use `scripts/publish_test_cases.py` only after local validation and human review pass. Read the destination from the configured publish settings and the Confluence credentials from `TASKFLOW_CONFIG_PATH`; never store or print credentials. Use the configured `test_case_template` to render the published content, exclude discarded cases, and record the publish result in `07-delivery.md`. Support `--dry-run` before any external write.
+
 If points are pending, stop. If evidence is unavailable, record the block; do not invent expected results.
