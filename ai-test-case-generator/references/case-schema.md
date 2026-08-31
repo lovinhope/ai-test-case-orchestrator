@@ -1,6 +1,26 @@
 # Candidate case schema
 
-Each `TC<NN>` must include: `commit_id`, priority, `test_point`, source/evidence, coverage type, preconditions, numbered steps, matching numbered expected results, `review_status: pending_human_review`, and `case_status: candidate`. Regression cases must include the historical defect reference. Unresolved rules remain `awaiting_confirmation` and cannot become final cases.
+This schema is the human-facing format authority for the local Markdown artifact `04-test-cases.md`. The artifact is not generated from or constrained by the Confluence `test_case_template`; a missing or unreadable Confluence template must not block generation. The schema must retain the requirement source, test-point traceability, priority, preconditions, executable steps, one-to-one expected results, review status, and candidate status.
+
+## Task-level metadata
+
+The Markdown document is organized around one task. Put the following shared fields once in the task header (for example, in `任务信息`), not inside every `TC<NN>`:
+
+| Field | Required | Meaning |
+|---|---|---|
+| 测试用例 | yes | Task name or test-case task title |
+| 相关JIRA | yes when available | Jira issue key or URL associated with the task |
+| 相关业务 | yes | Business domain or rule scope |
+| 相关模块 | optional | Product/module scope |
+| 相关表 | yes when applicable | Impacted or verified database tables |
+| 相关配置 | optional | Configuration, feature flag, or parameter scope |
+| 相关接口 | optional | Impacted or verified API/interface scope |
+| 相关定时任务 | optional | Impacted or verified scheduled-job scope |
+| 相关权限控制 | optional | Impacted role, permission, menu, or access-control scope |
+
+Keep other shared task context, such as `commit_id`, source/evidence, and requirement references, at task level when it applies to the whole task. Do not duplicate task-level fields in each case unless a particular case has a materially different value; in that exception, label the case-specific override explicitly.
+
+Each confirmed test point expands into one or more actual cases in this document. `TC01`, `TC02`, and subsequent IDs are test cases derived from test points, not additional task records. Each `TC<NN>` must include its linked `test_point`, priority, case objective, coverage type, preconditions, numbered steps, matching numbered expected results, `review_status: pending_human_review`, and `case_status: candidate`. Include case-specific source/evidence when needed for traceability, and include the historical defect reference for regression cases. Unresolved rules remain `awaiting_confirmation` and cannot become final cases.
 
 ## Test-case quality rules
 

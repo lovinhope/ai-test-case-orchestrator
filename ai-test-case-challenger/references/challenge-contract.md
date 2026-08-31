@@ -6,4 +6,6 @@ Review three distinct surfaces:
 2. Code/interface: changed branches, API/schema, persistence, transaction, idempotency, authorization, compatibility, and error handling.
 3. Integration: mismatch between business evidence, caller contract, and the verified diff.
 
-For every finding record `finding_id`, `commit_id`, `source_reference`, `evidence`, `risk`, `disposition`, and a question or observable behavior that can later become a test point. Mark missing evidence `awaiting_confirmation`.
+For every finding, render these Chinese fields in this exact order: `来源类型`、`来源及依据`、`证据`、`风险`、`处置`、`理由`、`请确认`. Also retain machine-readable `finding_id`, `commit_id`, `source_reference`, and `disposition` in internal metadata. “来源及依据” must identify the retained evidence; “风险” must state the product/code risk; “处置” must state test point, regression, awaiting confirmation, or skipped; “理由” must explain the disposition; and “请确认” must contain the concrete question or observable behavior. Mark missing evidence `awaiting_confirmation` and still render all seven fields.
+
+State preservation: confirmed or discarded findings are terminal historical records. Regeneration uses a new revision/generation ID and new finding IDs for changed findings; it never edits the prior finding, its disposition, or its review decision.
