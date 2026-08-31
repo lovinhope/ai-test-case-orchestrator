@@ -9,11 +9,11 @@ Before any Jira, Confluence, or GitLab evidence query, check `TASKFLOW_CONFIG_PA
 
 # AI Test Case Orchestrator
 
-## Interactive human-review modules
+## Human review modules
 
-Read [interaction-contract.md](references/interaction-contract.md) whenever a human-review page or conversational review surface is produced. All three review stages use interactive HTML: 产品/代码对抗, 测试点审评, and 测试用例评审. Implement the reviewer page with a backend template engine for server-rendered initial state, HTML/CSS for structure and presentation, and Alpine.js for local form interaction. Keep the server model and persisted Markdown artifact authoritative. Render evidence cards with document title, knowledge summary, source type, update time, source link, and a plain-language association reason; use human-readable numbers such as E01/Q01/TP01/TC01 while retaining internal IDs only in data attributes. A button click is not a submission: wire forms to the host review bridge, wait for persistence acknowledgement, and only then transition to the next stage. If the bridge is unavailable or persistence fails, keep the current stage active and show a retryable error. Do not use prose-only confirmation prompts, and do not let a submit action bypass a human gate.
+Read [interaction-contract.md](references/interaction-contract.md) for the conversational review protocol. The three review stages—产品/代码对抗、测试点审评、测试用例评审—must be handled directly in the Codex conversation. Keep the Markdown artifacts authoritative, show evidence and human-readable IDs such as E01/Q01/TP01/TC01, and do not advance a stage until the user explicitly confirms or supplies revisions. Do not generate HTML, CSS, JavaScript, review pages, or other UI artifacts.
 
-Follow the flow below. Keep the stages separate and preserve traceability from input to final test cases.
+Follow the flow below. Keep the stages separate and preserve traceability from input to final test cases. All stage artifacts use append-only revisions: confirmed or discarded challenge findings, test points, and test cases are immutable historical records. A regeneration creates a new `generation_id` under `revisions/<revision>/`, references the prior artifact, and never overwrites an original file, changes an original status, reuses an ID with a different meaning, or alters the original state graph.
 
 ## 1. Route the input
 
@@ -27,7 +27,7 @@ Select one or more applicable modes from the supplied evidence; do not require e
 | defect record or historical-defect knowledge-base evidence | `historical_defect` | symptom, trigger, root cause, fix, regression |
 | anonymized traffic or behavior aggregates | `business_profile` | frequency, unusual combinations, error distribution; supplemental only |
 
-Record `generation_mode`, `source_type`, `source_reference`, `prompt_version`, and `rule_version` in `00-input.md`. If multiple modes apply, record all of them and keep their evidence distinct.
+Record one task object in `00-input.md`, including `测试用例`, `相关JIRA`, `相关业务`, `相关模块` (optional), `相关表`, `相关配置` (optional), `相关接口` (optional), `相关定时任务` (optional), and `相关权限控制` (optional). Record `generation_mode`, `source_type`, `source_reference`, `prompt_version`, and `rule_version` there as task-level metadata. If multiple modes apply, record all of them and keep their evidence distinct.
 
 ## 2. Associate knowledge
 
@@ -84,7 +84,7 @@ Write `02-review.md` with findings under the single `产品/代码对抗` headin
 
 Stop after `02-review.md` and request human review of the unified 产品/代码对抗.
 
-The review page must show associated business, technical, and verified-code evidence at the top as readable evidence cards. Number questions as Q01, Q02, etc.; do not expose opaque evidence IDs as question labels. Render one input box per finding/question and a `提交评审` button. The button must submit through the host bridge, persist `02-review.md`, receive an acknowledgement, and only then hand off to test-point analysis. Record each response and disposition.
+In the conversation, show the associated business, technical, and verified-code evidence before the findings. Number questions as Q01, Q02, etc.; do not expose opaque evidence IDs as question labels. Ask the user to approve, modify, or reject each finding, persist the response in `02-review.md`, and only then hand off to test-point analysis. Record each response and disposition.
 
 - If approved, continue to test-point and regression-point analysis.
 - If rejected or modified, revise the association/challenge and repeat this gate.
@@ -109,7 +109,7 @@ Merge points with the same business object, data dimension, trigger, and expecte
 
 Stop after `03-test-points.md` and request human review.
 
-Render each point with a human-readable TP number, its related evidence cards, rule/flow, applied design method, traceability, and an input for supplementary information. Provide `新增测试点` and `提交测试点评审` buttons. The submit action must persist `03-test-points.md`, receive an acknowledgement, and only then hand off to historical-case association/case generation; preserve added or modified points as pending until explicitly confirmed.
+In the conversation, present each point with a human-readable TP number, evidence, rule/flow, design method, and traceability. Ask for supplementary information or new points, persist the user's decision in `03-test-points.md`, and only then hand off to historical-case association/case generation; preserve added or modified points as pending until explicitly confirmed.
 
 - If approved, continue to historical-case association.
 - If rejected or modified, revise the challenge/test points and repeat this gate.
@@ -129,7 +129,7 @@ Do not use an unread search result, Jira title, code, or model memory as a histo
 
 ## 8. Generate and review candidate cases
 
-Write `04-test-cases.md` only after test-point approval and historical-case association. When a case requires database records, the `ai-test-case-generator` test-data contract may be used to create and verify run-scoped records in a proven non-production test database; link the resulting `04-test-data-manifest.md` to the affected cases and do not claim data exists until verification succeeds. Each case is a candidate and must include:
+Write `04-test-cases.md` only after test-point approval and historical-case association. This local artifact is a normal Markdown document with one task-level metadata header; it is governed by the generator's `case-schema.md` and must not be formatted from or blocked by the Confluence `test_case_template`. Expand the confirmed test points into the actual cases `TC01`, `TC02`, and subsequent IDs. When a case requires database records, the `ai-test-case-generator` test-data contract may be used to create and verify run-scoped records in a proven non-production test database; link the resulting `04-test-data-manifest.md` to the affected cases and do not claim data exists until verification succeeds. Each case is a candidate and must include:
 
 - priority and linked test point;
 - source and evidence;
@@ -140,7 +140,7 @@ Write `04-test-cases.md` only after test-point approval and historical-case asso
 
 Write `05-case-human-review.md` and stop for a separate human decision on every case: adopted, modified, or discarded. Never mark generated cases adopted automatically.
 
-The interactive case-review page must show linked evidence cards, the linked task/requirement URL, requirement explanation, a human-readable unique case number such as TC01, purpose, preconditions, numbered steps, matching expected results, and priority for every case. Provide editable review inputs and a `提交测试用例评审` button. The submit action must persist `05-case-human-review.md`, receive an acknowledgement, and only then hand off to quality metrics/delivery. Follow the full HTML, bridge, evidence-card, numbering, acknowledgement, and payload requirements in `interaction-contract.md`.
+In the conversation, show the task-level metadata once, then for each unique case number such as TC01 show its linked test point, purpose, preconditions, numbered steps with one expected result per step, and priority. Ask the user to adopt, modify, or discard every case, persist the decision in `05-case-human-review.md`, and only then hand off to quality metrics/delivery.
 
 ## 9. Evaluate quality and coverage
 
@@ -152,6 +152,8 @@ After case review, calculate:
 - execution effectiveness when execution data exists: passed divided by executed.
 
 If the overall evaluation score is greater than 60%, pass the quality gate and deliver the reviewed test cases. If it is 60% or lower, return to association/challenge or test-point analysis, strengthen missing coverage, and repeat human review. Never fabricate execution data.
+
+For delivery/push, use the configured `test_case_template` as the Confluence published test-case format. Read and apply its field order, section names, table columns, naming conventions, status values, and example structure only when building the published content. Do not retroactively rewrite the local `04-test-cases.md` into that template. Publish only explicitly adopted or modified cases and record the destination and result in the delivery artifact.
 
 ## Artifacts
 
@@ -167,9 +169,10 @@ case/<case-name>/
   04-test-cases.md
   05-case-human-review.md
   06-quality-metrics.md
+  07-delivery.md
 ```
 
-The workflow must remain manual and evidence-backed. Do not generate automation code, write to a test-management platform, or silently skip a human gate.
+The workflow must remain manual and evidence-backed. Do not generate automation code, push pending or discarded cases, or silently skip a human gate. Any Confluence push must use the configured `test_case_template` format at delivery time.
 
 ## Human-facing output language
 
