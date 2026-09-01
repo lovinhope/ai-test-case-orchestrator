@@ -140,18 +140,22 @@ Write `04-test-cases.md` only after test-point approval and historical-case asso
 
 Write `05-case-human-review.md` and stop for a separate human decision on every case: adopted, modified, or discarded. Never mark generated cases adopted automatically.
 
-In the conversation, show the task-level metadata once, then for each unique case number such as TC01 show its linked test point, purpose, preconditions, numbered steps with one expected result per step, and priority. Ask the user to adopt, modify, or discard every case, persist the decision in `05-case-human-review.md`, and only then hand off to quality metrics/delivery.
+In the conversation, show the task-level metadata once, then for each unique case number such as TC01 show its linked test point, purpose, preconditions, numbered steps with one expected result per step, and priority. Ask the user to adopt, modify, or discard every case and persist the decision in `05-case-human-review.md`.
 
-## 9. Evaluate quality and coverage
+After the user completes this case-by-case confirmation, immediately run local publication validation and automatically push the adopted or modified cases to Confluence. Do not wait for or require quality-statistics approval. Exclude discarded and still-pending cases, apply the configured `test_case_template`, publish under `test_case_publish`, and persist the result in `07-delivery.md`.
 
-After case review, calculate:
+## 9. Automatically publish confirmed test cases
 
-- test-point coverage, including 100% P0 coverage;
-- candidate/adopted/modified/discarded counts;
-- adoption rate: adopted cases divided by generated candidates;
-- execution effectiveness when execution data exists: passed divided by executed.
+After case review, do not block delivery on quality statistics. First validate the confirmed cases and then automatically publish them to Confluence:
 
-If the overall evaluation score is greater than 60%, pass the quality gate and deliver the reviewed test cases. If it is 60% or lower, return to association/challenge or test-point analysis, strengthen missing coverage, and repeat human review. Never fabricate execution data.
+- run the configured publication validator/dry-run;
+- render the published content using the configured `test_case_template`;
+- publish only cases marked adopted or modified by the human reviewer;
+- exclude cases marked pending or discarded;
+- publish under the configured `test_case_publish` space and `menu_id`;
+- record the template, destination, case numbers, timestamp, page URL/ID, and result in `07-delivery.md`.
+
+If validation or publication fails, retain the local artifacts, record the failure, and do not report successful delivery. Quality statistics may be added later and must not prevent this publication step.
 
 For delivery/push, use the configured `test_case_template` as the Confluence published test-case format. Read and apply its field order, section names, table columns, naming conventions, status values, and example structure only when building the published content. Do not retroactively rewrite the local `04-test-cases.md` into that template. Publish only explicitly adopted or modified cases and record the destination and result in the delivery artifact.
 
@@ -168,7 +172,7 @@ case/<case-name>/
   04-historical-case-association.md
   04-test-cases.md
   05-case-human-review.md
-  06-quality-metrics.md
+  06-quality-metrics.md  # 暂不生成，预留后续质量统计
   07-delivery.md
 ```
 

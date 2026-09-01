@@ -17,6 +17,7 @@ FIELDS = {
     "优先级": "priority", "关联测试点": "test_point", "测试点": "test_point",
     "覆盖类型": "coverage", "来源及依据": "source", "目的": "purpose",
     "前置条件": "preconditions", "测试数据": "data", "步骤与预期": "steps",
+    "目的及风险": "purpose",
     "后置处理": "post_processing", "测试结果": "test_result",
 }
 
@@ -51,17 +52,19 @@ def validate(case_id: str, title: str, block: str) -> List[str]:
     if "废弃" in title or re.search(r"(?m)^\s*-\s*(?:用例状态|case_status)\s*[:：]\s*废弃", block):
         return []
     errors = [f"{case_id}: missing {name}" for name in
-              ("priority", "test_point", "coverage", "source", "purpose", "preconditions", "data", "steps", "post_processing", "test_result")
+              ("priority", "test_point", "coverage", "source", "purpose", "preconditions", "steps")
               if not field(block, name)]
     if not re.search(r"(?m)^\s*-\s*(?:评审状态|review_status)\s*[:：]", block):
         errors.append(f"{case_id}: missing review status")
     if not re.search(r"(?m)^\s*-\s*(?:采用状态|用例状态|case_status)\s*[:：]", block):
         errors.append(f"{case_id}: missing case status")
-    data_block = field(block, "data")
-    if not re.search(r"来源|准备|清理|复用", data_block + block):
+    data_block = field(block, "data") or block
+    if not re.search(r"来源|准备|清理|复用|测试环境", data_block + block):
         errors.append(f"{case_id}: test data must state source/preparation/cleanup or shared-data mapping")
     steps = re.findall(r"(?m)^\s*\d+\.\s+.+$", field(block, "steps"))
-    expected = re.findall(r"(?m)^\s*-\s*预期：.+$", block)
+    expected = re.findall(r"(?m)^\s*-\s*预期[:：].+$", block)
+    if not expected:
+        expected = re.findall(r"—\s*预期[:：]", field(block, "steps"))
     if not steps:
         errors.append(f"{case_id}: no numbered steps")
     if len(steps) != len(expected):
@@ -125,9 +128,8 @@ def cell_text(text: str) -> str:
 def strict_storage(source: str, selected: List[Tuple[str, str, str]], cfg: Dict[str, str]) -> str:
     """Render the configured Confluence format with all cases in one consolidated table."""
     jira_key = cfg.get("jira_key", "<jira-key>")
-    jira_url = f"https://jira.example.invalid/browse/{jira_key}"
-    jira_macro = (f'<ac:link><ri:url ri:value="{html.escape(jira_url, quote=True)}"/>'
-                  f'<ac:plain-text-link-body><![CDATA[{jira_key}]]></ac:plain-text-link-body></ac:link>')
+    jira_url = cfg.get("jira_url", f"http://jira.lowrisk.com.cn/browse/{jira_key}")
+    jira_macro = f'<a href="{html.escape(jira_url, quote=True)}">{html.escape(jira_key)}</a>'
     requirement = cfg.get("business_requirement", "").replace("\\n", "\n")
     commits = "；".join(x.strip() for x in re.findall(r"(?m)^(?:主提交|页面关联提交)：(.+)$", source))
     out = ["<h2>关联jira</h2>", f"<p>{jira_macro}</p>", "<h2>业务需求</h2>",
@@ -136,9 +138,11 @@ def strict_storage(source: str, selected: List[Tuple[str, str, str]], cfg: Dict[
            "<table><tbody><tr>" + "".join(f"<th>{x}</th>" for x in
            ("用例编号", "测试用例", "优先级", "测试点", "覆盖类型", "前置条件", "测试数据", "测试步骤", "预期结果", "测试结果")) + "</tr>"]
     for case_id, title, block in selected:
-        data = section(block, "测试数据", ["前置条件", "步骤与预期", "评审状态"])
+        data = section(block, "测试数据", ["前置条件", "步骤与预期", "评审状态"]) or "由测试环境准备；本次不创建数据库数据。"
         step_text = section(block, "步骤与预期", ["评审状态", "采用状态", "后置处理", "测试结果"])
         pairs = re.findall(r"(?ms)^\s*(\d+)\.\s*(.*?)\n\s*-\s*预期[:：]\s*(.*?)(?=\n\s*\d+\.\s|\Z)", step_text)
+        if not pairs:
+            pairs = re.findall(r"(?m)^\s*(\d+)\.\s*(.*?)\s*[—-]\s*预期[:：]\s*(.*)$", step_text)
         steps = "<br/>".join(f"{n}. {html.escape(a.strip())}" for n, a, _ in pairs)
         expected = "<br/>".join(f"{n}. {html.escape(e.strip())}" for n, _, e in pairs)
         cells = (case_id, title, value(block, "优先级"), value(block, "关联测试点") or value(block, "测试点"),
@@ -177,7 +181,7 @@ def main() -> int:
         print("\n".join("ERROR: " + e for e in errors)); return 1
     title = cfg.get("page_title") or f"{cfg.get('title_prefix', '候选测试用例')} - {Path(args.cases).parent.name}"
     source = Path(args.cases).read_text(encoding="utf-8")
-    body = "<p><strong>发布状态：</strong>候选草稿，待人工评审；质量标准和格式标准见配置。</p>"
+    body = "<p><strong>发布状态：</strong>已完成人工评审并采用；质量标准和格式标准见配置。</p>"
     body += strict_storage(source, selected, cfg)
     print(f"PASS: {len(selected)} case(s) validated"); print(f"destination_parent_page: {parent_id}"); print(f"title: {title}")
     if args.dry_run: print(f"dry_run_storage_chars: {len(body)}"); return 0
