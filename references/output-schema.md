@@ -52,4 +52,4 @@ When the requester uses Chinese, write `04-test-cases.md` with Chinese task-head
 
 Generated cases are candidates, not adopted cases. Use `用例状态：待人工评审` until `05-case-human-review.md` records an explicit human decision. Before creating `04-test-cases.md`, write `04-historical-case-association.md` from read Confluence historical-case evidence; retain the Confluence title, URL/page id, update time, match reason, and coverage decision.
 
-When regenerating, write the new artifacts below `revisions/<revision>/` and retain an explicit source-revision/supersession link. Never overwrite the original state graph or rewrite the status of a confirmed or discarded finding, point, or case.
+When a reviewer chooses “修改”, delete the old revision, write the modified artifacts below `revisions/<revision>/`, and retain an explicit supersession link with new IDs. Do not silently rewrite an old revision without that decision.

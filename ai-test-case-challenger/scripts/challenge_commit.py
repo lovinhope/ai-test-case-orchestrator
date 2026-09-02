@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Enforce commit identity before creating a challenge scaffold."""
+"""Validate optional commit identity before creating a challenge scaffold."""
 import argparse
 from pathlib import Path
 def main():
-    p = argparse.ArgumentParser(); p.add_argument("--case-dir", required=True); p.add_argument("--commit-id", required=True); p.add_argument("--association", required=True); p.add_argument("--revision", help="new revision name for regeneration"); a = p.parse_args()
+    p = argparse.ArgumentParser(); p.add_argument("--case-dir", required=True); p.add_argument("--commit-id"); p.add_argument("--association", required=True); p.add_argument("--revision", help="new revision name for regeneration"); a = p.parse_args()
     assoc = Path(a.association).read_text(encoding="utf-8")
-    if f"commit_id: {a.commit_id}" not in assoc: p.error("association artifact belongs to another commit")
+    if a.commit_id and f"commit_id: {a.commit_id}" not in assoc: p.error("association artifact belongs to another commit")
     root = Path(a.case_dir); root.mkdir(parents=True, exist_ok=True)
     target = root / "revisions" / a.revision if a.revision else root
     review = target / "02-review.md"

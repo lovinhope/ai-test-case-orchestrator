@@ -20,7 +20,7 @@ The Markdown document is organized around one task. Put the following shared fie
 
 Keep other shared task context, such as `commit_id`, source/evidence, and requirement references, at task level when it applies to the whole task. Do not duplicate task-level fields in each case unless a particular case has a materially different value; in that exception, label the case-specific override explicitly.
 
-Each confirmed test point expands into one or more actual cases in this document. `TC01`, `TC02`, and subsequent IDs are test cases derived from test points, not additional task records. Each `TC<NN>` must include its linked `test_point`, priority, case objective, coverage type, preconditions, numbered steps, matching numbered expected results, `review_status: pending_human_review`, and `case_status: candidate`. Include case-specific source/evidence when needed for traceability, and include the historical defect reference for regression cases. Unresolved rules remain `awaiting_confirmation` and cannot become final cases.
+Each confirmed test point expands into one or more actual cases in this document. `TC01`, `TC02`, and subsequent IDs are test cases derived from test points, not additional task records. Each `TC<NN>` must include its linked `test_point`, priority, case objective, coverage type, preconditions, numbered steps, matching numbered expected results, `review_status: awaiting_confirmation`, and `case_status: candidate`. After human review, use `review_status: confirmed` and `case_status: adopted`, `modified`, or `discarded` as applicable. Include case-specific source/evidence when needed for traceability, and include the historical defect reference for regression cases. Unresolved rules remain `awaiting_confirmation` and cannot become final cases.
 
 ## Test-case quality rules
 
@@ -109,4 +109,4 @@ Before writing `04-test-cases.md`, check that every candidate has:
 - appropriate risk coverage without unsupported assumptions;
 - independence/repeatability and maintainability considerations;
 - a plausible defect it could reveal;
-- `review_status: pending_human_review` and `case_status: candidate`.
+- `review_status: awaiting_confirmation` and `case_status: candidate`.

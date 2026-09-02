@@ -1,6 +1,6 @@
 ---
 name: ai-test-case-orchestrator
-description: Generate evidence-backed manual test cases from product requirements, API/interface definitions, source code, or historical defects. Route the input to the matching mode, associate Confluence/Jira/code knowledge, run one unified product/code challenge, obtain human approval for test points and cases, and evaluate coverage. Do not generate automation code.
+description: Generate evidence-backed manual test cases from one product requirement (Jira link or requirement document), with an optional Git Commit as supplementary implementation evidence. Route the requirement through association, product/code challenge, test-point confirmation, and case review. Do not generate automation code.
 ---
 
 # First-use credential preflight
@@ -13,7 +13,7 @@ Before any Jira, Confluence, or GitLab evidence query, check `TASKFLOW_CONFIG_PA
 
 Read [interaction-contract.md](references/interaction-contract.md) for the conversational review protocol. The three review stages—产品/代码对抗、测试点审评、测试用例评审—must be handled directly in the Codex conversation. Keep the Markdown artifacts authoritative, show evidence and human-readable IDs such as E01/Q01/TP01/TC01, and do not advance a stage until the user explicitly confirms or supplies revisions. Do not generate HTML, CSS, JavaScript, review pages, or other UI artifacts.
 
-Follow the flow below. Keep the stages separate and preserve traceability from input to final test cases. All stage artifacts use append-only revisions: confirmed or discarded challenge findings, test points, and test cases are immutable historical records. A regeneration creates a new `generation_id` under `revisions/<revision>/`, references the prior artifact, and never overwrites an original file, changes an original status, reuses an ID with a different meaning, or alters the original state graph.
+Follow the flow below. Keep the stages separate and preserve traceability from input to final test cases. A confirmed or skipped item remains stable until a reviewer chooses “修改”; modification deletes the old revision and creates a new `generation_id` under `revisions/<revision>/` with a supersession reference and new IDs. Do not silently change an old revision without an explicit modification decision.
 
 ## 1. Route the input
 
@@ -21,11 +21,7 @@ Select one or more applicable modes from the supplied evidence; do not require e
 
 | Input | Mode | Main focus |
 |---|---|---|
-| PRD, user story, Jira requirement, business rule | `requirement` | actors, rules, states, acceptance criteria |
-| OpenAPI/Swagger JSON or YAML, API contract | `openapi` | paths, methods, parameters, enums, responses, security, idempotency |
-| source files, repository, commit, diff | `source_code` | entry points, branches, exceptions, persistence, dependencies, transactions |
-| defect record or historical-defect knowledge-base evidence | `historical_defect` | symptom, trigger, root cause, fix, regression |
-| anonymized traffic or behavior aggregates | `business_profile` | frequency, unusual combinations, error distribution; supplemental only |
+| Jira requirement link or requirement document | `requirement` | actors, rules, states, acceptance criteria |
 
 Record one task object in `00-input.md`, including `测试用例`, `相关JIRA`, `相关业务`, `相关模块` (optional), `相关表`, `相关配置` (optional), `相关接口` (optional), `相关定时任务` (optional), and `相关权限控制` (optional). Record `generation_mode`, `source_type`, `source_reference`, `prompt_version`, and `rule_version` there as task-level metadata. If multiple modes apply, record all of them and keep their evidence distinct.
 
@@ -35,8 +31,8 @@ Read the configured knowledge sources before designing tests:
 
 1. Search and read Confluence business rules, related requirements, historical defects, and historical manual test cases.
 2. Read the supplied Jira issue or requirement and any explicitly linked Jira issues.
-3. For `source_code`, read the supplied source/diff or verified linked code. For `openapi`, read the complete contract.
-4. For requirement or interface input, extract code clues from the read technical solution and Jira development links, then resolve them against a configured repository/Git service or supplied source path. Read the matched files, diff, or commit before retaining them as code evidence.
+3. Read the single supplied requirement (Jira link or requirement document) as the primary input. If a Git Commit, API contract, or source path is supplied, treat it as supplementary evidence.
+4. Extract code clues from the requirement and optional technical evidence, then resolve them against a configured repository/Git service or supplied source path. Read matched files, diffs, or commits before retaining them as code evidence.
 5. Rank evidence by relevance first, then update time. A title, search snippet, class name, method name, endpoint name, or table name alone is not code evidence.
 
 ### Retrieval completeness
@@ -73,7 +69,7 @@ Do not expose credentials. Do not treat model inference, issue titles, branch na
 
 ## 3. Run one unified product/code challenge
 
-The challenge is one module named **产品/代码对抗**. Do not split it into separate product, code, and integration modules.
+The challenge is one stage named **产品/代码对抗**, with three required sections: product challenge, code/interface challenge, and integration/contract challenge. Keep the sections independent while retaining one unified human-review gate.
 
 Use the associated business evidence and implementation/interface evidence together to challenge:
 
@@ -82,7 +78,7 @@ Use the associated business evidence and implementation/interface evidence toget
 - requirement-to-implementation conflicts: mismatched fields, states, permission results, historical-data behavior, or response expectations;
 - historical defect exposure: whether the current input can regress a verified prior defect.
 
-Write `02-review.md` with findings under the single `产品/代码对抗` heading. Each finding must contain evidence, disposition, rationale, and source reference. Use `test_point`, `regression`, `awaiting_confirmation`, or `skipped`. If one evidence side is unavailable, state the shortfall and mark cross-side conclusions `awaiting_confirmation`; never invent expected results.
+Write `02-review.md` under the `产品/代码对抗` heading with independent product, code/interface, and integration/contract sections. Each finding must contain the fixed seven human-facing fields and only use `awaiting_confirmation` or `skipped` disposition. This stage only challenges potential risks and incomplete/conflicting rules; it does not generate test points or regression points. If one evidence side is unavailable, state the shortfall and mark the finding `awaiting_confirmation`; never invent expected results.
 
 ## 4. Human review gate for the challenge
 
@@ -91,7 +87,7 @@ Stop after `02-review.md` and request human review of the unified 产品/代码�
 In the conversation, show the associated business, technical, and verified-code evidence before the findings. Number questions as Q01, Q02, etc.; do not expose opaque evidence IDs as question labels. Every finding/question, both in the conversation and in `02-review.md`, must use exactly these seven visible fields in this order: `来源类型`、`来源及依据`、`证据`、`风险`、`处置`、`理由`、`请确认`. Do not use legacy labels such as `类型`、`触发输入`、`调用链`、`影响`、`建议处置` or `当前处置` as substitutes; put that information inside the seven fields. Ask the user to approve, modify, or reject each finding, persist the response in `02-review.md`, and only then hand off to test-point analysis. Record each response and disposition.
 
 - If approved, continue to test-point and regression-point analysis.
-- If rejected or modified, revise the association/challenge and repeat this gate.
+- If rejected, mark the finding `skipped`. If modified, delete the old revision and create a new revision with new finding IDs, preserving a supersession reference in the new revision.
 
 Do not generate or publish test points before this challenge review is approved.
 
@@ -146,11 +142,11 @@ Write `05-case-human-review.md` and stop for a separate human decision on every 
 
 In the conversation, show the task-level metadata once, then for each unique case number such as TC01 show its linked test point, purpose, preconditions, numbered steps with one expected result per step, and priority. Ask the user to adopt, modify, or discard every case and persist the decision in `05-case-human-review.md`.
 
-After the user completes this case-by-case confirmation, immediately run local publication validation and automatically push the adopted or modified cases to Confluence. Do not wait for or require quality-statistics approval. Exclude discarded and still-pending cases, apply the configured `test_case_template`, publish under `test_case_publish`, and persist the result in `07-delivery.md`.
+After the user completes this case-by-case confirmation, immediately run local publication validation and automatically push the adopted or modified cases to Confluence. Exclude discarded and still-pending cases, apply the configured `test_case_template`, publish under `test_case_publish`, and persist the result in `07-delivery.md`.
 
 ## 9. Automatically publish confirmed test cases
 
-After case review, do not block delivery on quality statistics. First validate the confirmed cases and then automatically publish them to Confluence:
+After case review, first validate the confirmed cases and then automatically publish them to Confluence:
 
 - run the configured publication validator/dry-run;
 - render the published content using the configured `test_case_template`;
@@ -159,7 +155,7 @@ After case review, do not block delivery on quality statistics. First validate t
 - publish under the configured `test_case_publish` space and `menu_id`;
 - record the template, destination, case numbers, timestamp, page URL/ID, and result in `07-delivery.md`.
 
-If validation or publication fails, retain the local artifacts, record the failure, and do not report successful delivery. Quality statistics may be added later and must not prevent this publication step.
+If validation or publication fails, retain the local artifacts, record the failure, and do not report successful delivery.
 
 For delivery/push, use the configured `test_case_template` as the Confluence published test-case format. Read and apply its field order, section names, table columns, naming conventions, status values, and example structure only when building the published content. Do not retroactively rewrite the local `04-test-cases.md` into that template. Publish only explicitly adopted or modified cases and record the destination and result in the delivery artifact.
 
@@ -176,7 +172,6 @@ case/<case-name>/
   04-historical-case-association.md
   04-test-cases.md
   05-case-human-review.md
-  06-quality-metrics.md  # 暂不生成，预留后续质量统计
   07-delivery.md
 ```
 

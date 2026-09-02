@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Verify one-commit inputs and the human gate before case scaffolding."""
+"""Verify requirement/test-point inputs and the human gate before case scaffolding."""
 import argparse
 import re
 from pathlib import Path
 def main():
-    p = argparse.ArgumentParser(); p.add_argument("--case-dir", required=True); p.add_argument("--commit-id", required=True); p.add_argument("--test-points", required=True); p.add_argument("--revision", help="new revision name for regeneration"); a = p.parse_args()
+    p = argparse.ArgumentParser(); p.add_argument("--case-dir", required=True); p.add_argument("--commit-id"); p.add_argument("--test-points", required=True); p.add_argument("--revision", help="new revision name for regeneration"); a = p.parse_args()
     points = Path(a.test_points).read_text(encoding="utf-8")
-    if f"commit_id: {a.commit_id}" not in points: p.error("test points belong to another commit")
+    if a.commit_id and f"commit_id: {a.commit_id}" not in points: p.error("test points belong to another commit")
     if re.search(r"(?im)^- status: pending_confirmation\s*$", points): p.error("human confirmation is required before case generation")
     root = Path(a.case_dir); root.mkdir(parents=True, exist_ok=True)
     target = root / "revisions" / a.revision if a.revision else root
@@ -30,7 +30,7 @@ def main():
         "- 相关权限控制: <选填>\n"
         f"- commit_id: {a.commit_id}\n"
         "\n<!-- 已确认测试点将在此展开为 TC01、TC02 等实际测试用例。 -->\n"
-        "\n- status: pending_human_review\n",
+        "\n- review_status: awaiting_confirmation\n- case_status: candidate\n",
         encoding="utf-8",
     )
     print(f"created case scaffold: {target}")

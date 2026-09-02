@@ -3,9 +3,9 @@
 import argparse
 from pathlib import Path
 def main():
-    p = argparse.ArgumentParser(); p.add_argument("--case-dir", required=True); p.add_argument("--commit-id", required=True); p.add_argument("--association", required=True); p.add_argument("--review", required=True); p.add_argument("--revision", help="new revision name for regeneration"); a = p.parse_args()
+    p = argparse.ArgumentParser(); p.add_argument("--case-dir", required=True); p.add_argument("--commit-id"); p.add_argument("--association", required=True); p.add_argument("--review", required=True); p.add_argument("--revision", help="new revision name for regeneration"); a = p.parse_args()
     text = Path(a.association).read_text(encoding="utf-8") + Path(a.review).read_text(encoding="utf-8")
-    if text.count(f"commit_id: {a.commit_id}") < 2: p.error("upstream artifacts do not share this commit")
+    if a.commit_id and text.count(f"commit_id: {a.commit_id}") < 2: p.error("upstream artifacts do not share this commit")
     root = Path(a.case_dir); root.mkdir(parents=True, exist_ok=True)
     target = root / "revisions" / a.revision if a.revision else root
     points = target / "03-test-points.md"

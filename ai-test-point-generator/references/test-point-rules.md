@@ -6,7 +6,7 @@
 - Describe actor/data, trigger, and observable business outcome before implementation details.
 - Deduplicate only when setup and observable result are materially the same; retain all evidence references.
 - Every point has `point_id`, `commit_id`, priority, type, source, expected focus, and confirmation status.
-- Every generation has a `generation_id`/revision and a source challenge revision. Confirmed or discarded points are immutable; regenerated points use new IDs and are linked to the superseded point instead of changing its original status.
+- Every generation has a `generation_id`/revision and a source challenge revision. A confirmed or discarded point remains stable unless the reviewer explicitly chooses “修改”; modification deletes the old revision and creates a new revision with new IDs and a supersession link.
 
 ## Systematic coverage method
 
