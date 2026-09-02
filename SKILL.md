@@ -39,6 +39,10 @@ Read the configured knowledge sources before designing tests:
 4. For requirement or interface input, extract code clues from the read technical solution and Jira development links, then resolve them against a configured repository/Git service or supplied source path. Read the matched files, diff, or commit before retaining them as code evidence.
 5. Rank evidence by relevance first, then update time. A title, search snippet, class name, method name, endpoint name, or table name alone is not code evidence.
 
+### Retrieval completeness
+
+Every Confluence search must be fully paginated: follow the returned `next` link or advance the `start`/cursor until the reported total is consumed. Record query count, pages traversed, result count, deduplicated page count, read failures, and exclusion reasons; never conclude “not found” from the first 20 results. Build and run a separate keyword matrix covering the current Jira key/title, explicitly linked and historical Jira keys, business objects/rules, implementation/module/configuration/interface identifiers, and page-title variants/synonyms. Read plausible page bodies and inspect ancestors, parent indexes, and linked children before classification. A historical Jira key is not an exclusion reason; exclude weekly reports, QA plans, release notes, daily summaries, and status pages only with a read-based reason.
+
 When a relevant Confluence page is found, inspect its ancestors, parent index, linked child pages, and index entries. An indexed page does not need to be newly created or contain the supplied Jira key to be associated. Read the target page body before retaining it, and record the index/parent relationship as association evidence.
 
 For interface and technical-solution association, search both business terms and implementation identifiers: feature names, permission-model terms, API paths, resource types, table names, service methods, and migration terms. Do not limit retrieval to the supplied Jira key or to the newest page.
@@ -84,7 +88,7 @@ Write `02-review.md` with findings under the single `产品/代码对抗` headin
 
 Stop after `02-review.md` and request human review of the unified 产品/代码对抗.
 
-In the conversation, show the associated business, technical, and verified-code evidence before the findings. Number questions as Q01, Q02, etc.; do not expose opaque evidence IDs as question labels. Ask the user to approve, modify, or reject each finding, persist the response in `02-review.md`, and only then hand off to test-point analysis. Record each response and disposition.
+In the conversation, show the associated business, technical, and verified-code evidence before the findings. Number questions as Q01, Q02, etc.; do not expose opaque evidence IDs as question labels. Every finding/question, both in the conversation and in `02-review.md`, must use exactly these seven visible fields in this order: `来源类型`、`来源及依据`、`证据`、`风险`、`处置`、`理由`、`请确认`. Do not use legacy labels such as `类型`、`触发输入`、`调用链`、`影响`、`建议处置` or `当前处置` as substitutes; put that information inside the seven fields. Ask the user to approve, modify, or reject each finding, persist the response in `02-review.md`, and only then hand off to test-point analysis. Record each response and disposition.
 
 - If approved, continue to test-point and regression-point analysis.
 - If rejected or modified, revise the association/challenge and repeat this gate.
