@@ -61,14 +61,27 @@ def _render_review_markdown(payload, fixture):
         "",
     ]
     for item in payload["items"]:
+        question = question_by_id[item["id"]]
+        evidence = "; ".join(
+            next(e["summary"] for e in fixture["evidence"] if e["id"] == evidence_id)
+            for evidence_id in question["evidence_ids"]
+        ) or "待补充"
+        disposition = {
+            "confirmed": ("测试点", "test_point"),
+            "discarded": ("跳过", "skipped"),
+            "irrelevant": ("跳过", "skipped"),
+        }[item["decision"]]
         lines.extend(
             [
                 f"### {item['number']} {item['title']}",
-                f"- finding_id: {item['id']}",
-                f"- decision: {item['decision']}",
-                f"- response: {item['response'] or '（未填写）'}",
-                f"- reason: {item['reason'] or '（未填写）'}",
-                f"- source_reference: {question_by_id[item['id']]['source_reference']}",
+                f"<!-- finding_id: {item['id']}; commit_id: {fixture['commit_id']}; source_reference: {question['source_reference']}; disposition: {disposition[1]} -->",
+                f"- 来源类型：{question['surface']}",
+                f"- 来源及依据：{question['source_reference']}",
+                f"- 证据：{evidence}",
+                f"- 风险：{question['rationale']}",
+                f"- 处置：{disposition[0]}",
+                f"- 理由：{item['reason'] or item['response'] or '待补充'}",
+                f"- 请确认：{question['rule']}；评审意见：{item['response'] or '待补充'}",
                 "",
             ]
         )

@@ -100,8 +100,14 @@ class ChallengeReviewTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         artifact = self.case_root / "demo-challenge" / "02-review.md"
         text = artifact.read_text(encoding="utf-8")
-        self.assertIn("decision: discarded", text)
-        self.assertIn("decision: irrelevant", text)
+        self.assertIn("- 处置：跳过", text)
+        self.assertIn("disposition: skipped", text)
+        self.assertIn("- 来源类型：", text)
+        self.assertIn("- 来源及依据：", text)
+        self.assertIn("- 证据：", text)
+        self.assertIn("- 风险：", text)
+        self.assertIn("- 理由：", text)
+        self.assertIn("- 请确认：", text)
 
     @patch("web.app.subprocess.run")
     def test_duplicate_submission_is_idempotent(self, run):
