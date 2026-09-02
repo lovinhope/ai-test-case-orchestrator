@@ -3,10 +3,11 @@
 import argparse
 import configparser
 import html
+from html.parser import HTMLParser
 import os
 import re
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import requests
 
@@ -125,31 +126,154 @@ def cell_text(text: str) -> str:
     return "<br/>".join(html.escape(x) for x in lines)
 
 
-def strict_storage(source: str, selected: List[Tuple[str, str, str]], cfg: Dict[str, str]) -> str:
-    """Render the configured Confluence format with all cases in one consolidated table."""
+class TemplateParser(HTMLParser):
+    """Extract the ordered headings and table headers from Confluence storage HTML."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.headings: List[Tuple[int, str]] = []
+        self.tables: List[List[str]] = []
+        self._heading_level: Optional[int] = None
+        self._heading_parts: List[str] = []
+        self._table_rows: List[List[str]] = []
+        self._row: Optional[List[str]] = None
+        self._cell_parts: List[str] = []
+        self._in_cell = False
+
+    def handle_starttag(self, tag: str, attrs: List[Tuple[str, Optional[str]]]) -> None:
+        match = re.fullmatch(r"h([1-6])", tag.lower())
+        if match:
+            self._heading_level = int(match.group(1)); self._heading_parts = []
+        elif tag.lower() == "table":
+            self._table_rows = []
+        elif tag.lower() == "tr":
+            self._row = []
+        elif tag.lower() in {"th", "td"} and self._row is not None:
+            self._in_cell = True; self._cell_parts = []
+
+    def handle_endtag(self, tag: str) -> None:
+        tag = tag.lower()
+        if re.fullmatch(r"h[1-6]", tag) and self._heading_level is not None:
+            self.headings.append((self._heading_level, "".join(self._heading_parts).strip()))
+            self._heading_level = None
+        elif tag in {"th", "td"} and self._in_cell and self._row is not None:
+            self._row.append("".join(self._cell_parts).strip()); self._in_cell = False
+        elif tag == "tr" and self._row is not None:
+            self._table_rows.append(self._row); self._row = None
+        elif tag == "table":
+            if self._table_rows: self.tables.append(self._table_rows)
+
+    def handle_data(self, data: str) -> None:
+        if self._heading_level is not None: self._heading_parts.append(data)
+        if self._in_cell: self._cell_parts.append(data)
+
+
+def template_structure(storage_html: str) -> TemplateParser:
+    parser = TemplateParser(); parser.feed(storage_html); parser.close()
+    if not parser.headings or not parser.tables or not parser.tables[0]:
+        raise RuntimeError("configured template must contain ordered headings and at least one table")
+    return parser
+
+
+def template_id() -> str:
+    path = os.getenv("TASKFLOW_CONFIG_PATH", "").strip()
+    if not path: raise RuntimeError("TASKFLOW_CONFIG_PATH is not configured")
+    parser = configparser.ConfigParser(); parser.read(path, encoding="utf-8")
+    if not parser.has_section("test_case_template"):
+        raise RuntimeError("TASKFLOW_CONFIG_PATH must contain [test_case_template]")
+    raw = parser.get("test_case_template", "page_id", fallback="").strip()
+    if not raw: raw = parser.get("test_case_template", "url", fallback="").strip()
+    match = re.search(r"(?:pageId=|/)(\d+)(?:\D|$)", raw)
+    value = match.group(1) if match else raw
+    if not value.isdigit(): raise RuntimeError("[test_case_template] must contain a numeric page_id or URL")
+    return value
+
+
+def fetch_template(base: str, headers: Dict[str, str]) -> Tuple[str, TemplateParser]:
+    page = template_id()
+    response = requests.get(f"{base}/rest/api/content/{page}", params={"expand": "body.storage"}, headers=headers, timeout=60)
+    response.raise_for_status()
+    storage_html = ((response.json().get("body") or {}).get("storage") or {}).get("value", "")
+    if not storage_html: raise RuntimeError(f"template page {page} has no storage body")
+    return page, template_structure(storage_html)
+
+
+def normalize_label(label: str) -> str:
+    return re.sub(r"[\s:：/（）()]+", "", label).lower()
+
+
+def task_value(heading: str, source: str, cfg: Dict[str, str], commits: str) -> str:
+    normalized = normalize_label(heading)
+    aliases = {
+        "关联jira": cfg.get("jira_key", "<jira-key>"),
+        "业务需求": cfg.get("business_requirement", ""),
+        "实现逻辑": commits or "见各用例来源及依据",
+    }
+    if normalized in aliases: return aliases[normalized]
+    for label in ("相关模块", "相关表", "相关配置", "相关接口", "相关定时任务", "相关权限控制"):
+        if normalized == normalize_label(label):
+            match = re.search(rf"(?m)^-\s*{re.escape(label)}\s*[:：]\s*(.+)$", source)
+            return match.group(1).strip() if match else ""
+    return ""
+
+
+def case_value(case_id: str, title: str, block: str, header: str) -> str:
+    normalized = normalize_label(header)
+    if normalized == "用例编号": return case_id
+    if normalized in {"测试用例", "用例"}: return title
+    mapping = {"优先级": "优先级", "测试点": "关联测试点", "关联测试点": "关联测试点",
+               "覆盖类型": "覆盖类型", "来源及依据": "来源及依据", "目的": "目的",
+               "前置条件": "前置条件", "测试数据": "测试数据", "测试步骤": "步骤与预期",
+               "步骤与预期": "步骤与预期", "测试结果": "测试结果"}
+    label = mapping.get(header, mapping.get(normalized, ""))
+    if normalized in {"测试步骤", "步骤与预期"}:
+        text = section(block, "步骤与预期", ["评审状态", "采用状态", "用例状态", "后置处理", "测试结果"])
+        pairs = re.findall(r"(?ms)^\s*(\d+)\.\s*(.*?)\n\s*-\s*预期[:：]\s*(.*?)(?=\n\s*\d+\.\s|\Z)", text)
+        return "<br/>".join(f"{n}. {html.escape(a.strip())}" for n, a, _ in pairs)
+    if normalized == "预期结果":
+        text = section(block, "步骤与预期", ["评审状态", "采用状态", "用例状态", "后置处理", "测试结果"])
+        pairs = re.findall(r"(?ms)^\s*(\d+)\.\s*(.*?)\n\s*-\s*预期[:：]\s*(.*?)(?=\n\s*\d+\.\s|\Z)", text)
+        return "<br/>".join(f"{n}. {html.escape(e.strip())}" for n, _, e in pairs)
+    if label == "测试结果": return value(block, "测试结果")
+    if label == "测试数据": return cell_text(section(block, label, ["前置条件", "步骤与预期", "评审状态"]) or "由测试环境准备；本次不创建数据库数据。")
+    if label == "前置条件": return cell_text(value(block, label))
+    return value(block, label)
+
+
+def render_from_template(source: str, selected: List[Tuple[str, str, str]], cfg: Dict[str, str], template: TemplateParser) -> str:
+    """Render only the ordered headings and first-table schema learned from the template."""
     jira_key = cfg.get("jira_key", "<jira-key>")
     jira_url = cfg.get("jira_url", f"http://jira.lowrisk.com.cn/browse/{jira_key}")
-    jira_macro = f'<a href="{html.escape(jira_url, quote=True)}">{html.escape(jira_key)}</a>'
     requirement = cfg.get("business_requirement", "").replace("\\n", "\n")
     commits = "；".join(x.strip() for x in re.findall(r"(?m)^(?:主提交|页面关联提交)：(.+)$", source))
-    out = ["<h2>关联jira</h2>", f"<p>{jira_macro}</p>", "<h2>业务需求</h2>",
-           f"<p>{html.escape(requirement).replace(chr(10), '<br/>')}</p>", "<h2>实现逻辑</h2>",
-           f"<p>{html.escape(commits or '见各用例来源及依据')}</p>", "<h2>测试用例</h2>",
-           "<table><tbody><tr>" + "".join(f"<th>{x}</th>" for x in
-           ("用例编号", "测试用例", "优先级", "测试点", "覆盖类型", "前置条件", "测试数据", "测试步骤", "预期结果", "测试结果")) + "</tr>"]
-    for case_id, title, block in selected:
-        data = section(block, "测试数据", ["前置条件", "步骤与预期", "评审状态"]) or "由测试环境准备；本次不创建数据库数据。"
-        step_text = section(block, "步骤与预期", ["评审状态", "采用状态", "后置处理", "测试结果"])
-        pairs = re.findall(r"(?ms)^\s*(\d+)\.\s*(.*?)\n\s*-\s*预期[:：]\s*(.*?)(?=\n\s*\d+\.\s|\Z)", step_text)
-        if not pairs:
-            pairs = re.findall(r"(?m)^\s*(\d+)\.\s*(.*?)\s*[—-]\s*预期[:：]\s*(.*)$", step_text)
-        steps = "<br/>".join(f"{n}. {html.escape(a.strip())}" for n, a, _ in pairs)
-        expected = "<br/>".join(f"{n}. {html.escape(e.strip())}" for n, _, e in pairs)
-        cells = (case_id, title, value(block, "优先级"), value(block, "关联测试点") or value(block, "测试点"),
-                 value(block, "覆盖类型"), value(block, "前置条件"), cell_text(data), steps, expected, value(block, "测试结果"))
-        out.append("<tr>" + "".join(f"<td>{html.escape(x) if '<br/>' not in x else x}</td>" for x in cells) + "</tr>")
-    out.append("</tbody></table>")
+    out: List[str] = []
+    table_headers = template.tables[0][0]
+    table_heading = normalize_label("测试用例")
+    for level, heading in template.headings:
+        tag = f"h{level}"
+        out.append(f"<{tag}>{html.escape(heading)}</{tag}>")
+        if normalize_label(heading) == table_heading:
+            out.append("<table><tbody><tr>" + "".join(f"<th>{html.escape(x)}</th>" for x in table_headers) + "</tr>")
+            for case_id, title, block in selected:
+                cells = [case_value(case_id, title, block, header) for header in table_headers]
+                out.append("<tr>" + "".join(f"<td>{x if '<br/>' in x else html.escape(x)}</td>" for x in cells) + "</tr>")
+            out.append("</tbody></table>")
+        else:
+            text = task_value(heading, source, cfg, commits)
+            out.append(f"<p>{html.escape(text).replace(chr(10), '<br/>')}</p>")
     return "".join(out)
+
+
+def structure_signature(storage_html: str) -> Tuple[List[Tuple[int, str]], List[List[str]]]:
+    parsed = template_structure(storage_html)
+    return parsed.headings, [rows[0] for rows in parsed.tables]
+
+
+def assert_template_structure(template: TemplateParser, rendered: str) -> None:
+    headings, tables = structure_signature(rendered)
+    expected = (template.headings, [rows[0] for rows in template.tables])
+    if (headings, tables) != expected:
+        raise RuntimeError("rendered content does not match template heading/table structure; publication blocked")
 
 
 def auth() -> Tuple[str, Dict[str, str]]:
@@ -181,11 +305,13 @@ def main() -> int:
         print("\n".join("ERROR: " + e for e in errors)); return 1
     title = cfg.get("page_title") or f"{cfg.get('title_prefix', '候选测试用例')} - {Path(args.cases).parent.name}"
     source = Path(args.cases).read_text(encoding="utf-8")
-    body = "<p><strong>发布状态：</strong>已完成人工评审并采用；质量标准和格式标准见配置。</p>"
-    body += strict_storage(source, selected, cfg)
-    print(f"PASS: {len(selected)} case(s) validated"); print(f"destination_parent_page: {parent_id}"); print(f"title: {title}")
-    if args.dry_run: print(f"dry_run_storage_chars: {len(body)}"); return 0
     base, headers = auth()
+    template_page, template = fetch_template(base, headers)
+    body = render_from_template(source, selected, cfg, template)
+    assert_template_structure(template, body)
+    print(f"PASS: {len(selected)} case(s) validated"); print(f"destination_parent_page: {parent_id}"); print(f"title: {title}")
+    print(f"template_page_id: {template_page}")
+    if args.dry_run: print(f"dry_run_storage_chars: {len(body)}"); return 0
     if args.update_page:
         page_resp = requests.get(f"{base}/rest/api/content/{args.update_page}?expand=version,space", headers=headers, timeout=60); page_resp.raise_for_status()
         page = page_resp.json(); version = int((page.get("version") or {}).get("number", 0))
